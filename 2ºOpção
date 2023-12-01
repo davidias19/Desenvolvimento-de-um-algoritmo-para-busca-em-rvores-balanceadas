@@ -1,0 +1,141 @@
+struct Node {
+    int n; // número de chaves no nó
+    int keys[3]; // vetor de chaves
+    int values[3]; // vetor de valores
+    Node* links[4]; // vetor de ponteiros para os subárvores
+};
+
+// Função para criar um novo nó 2-3
+Node* newNode(int key, int value) {
+    Node* node = new Node;
+    node->n = 1;
+    node->keys[0] = key;
+    node->values[0] = value;
+    for (int i = 0; i < 4; i++) {
+        node->links[i] = NULL;
+    }
+    return node;
+}
+
+// Função para buscar uma chave em uma árvore 2-3
+int search(Node* root, int key) {
+    if (root == NULL) {
+        return -1; // chave não encontrada
+    }
+    for (int i = 0; i < root->n; i++) {
+        if (key == root->keys[i]) {
+            return root->values[i]; // chave encontrada
+        }
+        if (key < root->keys[i]) {
+            return search(root->links[i], key); // busca na subárvore esquerda
+        }
+    }
+    return search(root->links[root->n], key); // busca na subárvore direita
+}
+
+// Função para inserir uma chave em uma árvore 2-3
+Node* insert(Node* root, int key, int value) {
+    if (root == NULL) {
+        return newNode(key, value); // cria um novo nó
+    }
+    if (root->n == 3) {
+        // se o nó é um 4-nó temporário, divide ele em dois 2-nós e retorna o nó do meio
+        Node* left = newNode(root->keys[0], root->values[0]);
+        Node* right = newNode(root->keys[2], root->values[2]);
+        left->links[0] = root->links[0];
+        left->links[1] = root->links[1];
+        right->links[0] = root->links[2];
+        right->links[1] = root->links[3];
+        root->n = 1;
+        root->keys[0] = root->keys[1];
+        root->values[0] = root->values[1];
+        root->links[0] = left;
+        root->links[1] = right;
+        root->links[2] = NULL;
+        root->links[3] = NULL;
+    }
+    // insere a chave no nó apropriado
+    int i = root->n - 1;
+    while (i >= 0 && key < root->keys[i]) {
+        i--;
+    }
+    i++;
+    Node* temp = insert(root->links[i], key, value);
+    if (temp != root->links[i]) {
+        // se houve uma divisão no nível inferior, move a chave do meio para o nó atual
+        for (int j = root->n; j > i; j--) {
+            root->keys[j] = root->keys[j-1];
+            root->values[j] = root->values[j-1];
+            root->links[j+1] = root->links[j];
+        }
+        root->keys[i] = temp->keys[0];
+        root->values[i] = temp->values[0];
+        root->links[i] = temp->links[0];
+        root->links[i+1] = temp->links[1];
+        root->n++;
+    }
+    return root;
+}
+
+// Função para remover uma chave de uma árvore 2-3
+Node* remove(Node* root, int key) {
+    if (root == NULL) {
+        return NULL; // chave não encontrada
+    }
+    int i = 0;
+    while (i < root->n && key > root->keys[i]) {
+        i++;
+    }
+    if (i < root->n && key == root->keys[i]) {
+        // chave encontrada no nó atual
+        if (root->links[i] == NULL) {
+            // se o nó é uma folha, remove a chave e o valor
+            for (int j = i; j < root->n - 1; j++) {
+                root->keys[j] = root->keys[j+1];
+                root->values[j] = root->values[j+1];
+            }
+            root->n--;
+            if (root->n == 0) {
+                delete root;
+                return NULL;
+            }
+            return root;
+        } else {
+            // se o nó não é uma folha, troca a chave e o valor com o sucessor e remove o sucessor
+            Node* succ = root->links[i+1];
+            while (succ->links[0] != NULL) {
+                succ = succ->links[0];
+            }
+            root->keys[i] = succ->keys[0];
+            root->values[i] = succ->values[0];
+            root->links[i+1] = remove(root->links[i+1], succ->keys[0]);
+        }
+    } else {
+        // chave não encontrada no nó atual, busca na subárvore apropriada
+        root->links[i] = remove(root->links[i], key);
+    }
+    if (root->links[i] != NULL && root->links[i]->n == 0) {
+        // se a subárvore ficou vazia, deleta o ponteiro
+        delete root->links[i];
+        root->links[i] = NULL;
+    }
+    if (root->links[i] == NULL) {
+        // se o nó ficou com um ponteiro nulo, tenta pegar uma chave emprestada do irmão ou fazer uma fusão
+        if (i > 0 && root->links[i-1] != NULL && root->links[i-1]->n > 1) {
+            // pega uma chave emprestada do irmão esquerdo
+            Node* child = newNode(root->keys[i-1], root->values[i-1]);
+            child->links[0] = root->links[i-1]->links[root->links[i-1]->n];
+            child->links[1] = root->links[i];
+            root->keys[i-1] = root->links[i-1]->keys[root->links[i-1]->n - 1];
+            root->values[i-1] = root->links[i-1]->values[root->links[i-1]->n - 1];
+            root->links[i-1]->n--;
+            root->links[i] = child;
+        } else if (i < root->n && root->links[i+1] != NULL && root->links[i+1]->n > 1) {
+            // pega uma chave emprestada do irmão direito
+            Node* child = newNode(root->keys[i], root->values[i]);
+            child->links[0] = root->links[i];
+            child->links[1] = root->links[i+1]->links[0];
+            root->keys[i] = root->links[i+1]->keys[0];
+            root->values[i] = root->links[i+1]->values[0];
+            for (int j = 0; j < root->links[i+1]->n - 1; j++) {
+                root
